@@ -10,11 +10,12 @@ from time import time
 def get_vocab_from_batch(ds: Dataset, batch_size: int, offset: int):
     vocab = []
     for i in range(batch_size):
-        text = ds[offset + i]["text"]
-        words = [word.strip(string.punctuation) for word in text.split() if word.strip(string.punctuation).isalnum()]
-        for word in words:
-            if word not in vocab:
-                vocab.append(word)
+        if (offset + i) < ds.num_rows:
+            text = ds[offset + i]["text"]
+            words = [word.strip(string.punctuation) for word in text.split() if word.strip(string.punctuation).isalnum()]
+            for word in words:
+                if word not in vocab:
+                    vocab.append(word)
 
     return (vocab, offset + batch_size)
 
@@ -36,15 +37,16 @@ def write_vocab(vocab: deque, min_done_idx: int):
     with open("./vocab/vocab_progress.txt", "w+") as file:
         file.write(str(min_done_idx))
 
-def write_benchmarks(batch_size: int, n_proc: int, vocab_size: int, articles_processed: int, time_info: float, avg_time_info: float):
+def write_benchmarks(batch_size: int, n_proc: int, vocab_size: int, articles_processed: int, n_rows: int, time_info: float, avg_time_info: float):
     with open("./vocab/benchmarks.csv", "a+") as file:
-        file.write(f"{batch_size}, {n_proc}, {vocab_size}, {articles_processed}, {time_info:0.01f}, {avg_time_info:0.01f}\n")
+        file.write(f"{batch_size}, {n_proc}, {vocab_size}, {articles_processed}/{n_rows}, {time_info:0.01f}, {avg_time_info:0.01f}\n")
 
 
 if __name__ == "__main__":
     # had some problems using latest version, so I opted to use the already processed hf one
-    ds = load_dataset("wikipedia", "20220301.en")["train"]
+    ds = load_dataset("wikitext", "wikitext-2-raw-v1")["train"]
     num_rows = ds.num_rows
+    print(ds)
 
     load_dotenv()
     batch_size = int(getenv("BATCH_SIZE"))
@@ -88,7 +90,7 @@ if __name__ == "__main__":
                 if i % save_frq == 1:
                     write_vocab(vocab, min_done_idx)
                     time_new = time()
-                    write_benchmarks(batch_size, n_proc, len(vocab), min_done_idx, (time_new-time_last) / save_frq, (time_new - time_start) / (i+1))
+                    write_benchmarks(batch_size, n_proc, len(vocab), min_done_idx, num_rows, (time_new-time_last) / save_frq, (time_new - time_start) / (i+1))
                     time_last = time_new
 
                 if i == 100:
